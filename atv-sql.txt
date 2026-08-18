@@ -1,0 +1,146 @@
+-- Aula prática: do modelo relacional ao MongoDB
+-- SGBD: PostgreSQL
+
+CREATE TABLE clientes (
+  id_cliente INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  nome VARCHAR(100) NOT NULL,
+  email VARCHAR(120) NOT NULL UNIQUE,
+  telefone VARCHAR(20),
+  ativo BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE enderecos (
+  id_endereco INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id_cliente INTEGER NOT NULL REFERENCES clientes(id_cliente),
+  apelido VARCHAR(30) NOT NULL,
+  logradouro VARCHAR(120) NOT NULL,
+  numero VARCHAR(10) NOT NULL,
+  cidade VARCHAR(80) NOT NULL,
+  uf CHAR(2) NOT NULL,
+  cep CHAR(8) NOT NULL,
+  UNIQUE (id_cliente, apelido)
+);
+
+CREATE TABLE categorias (
+  id_categoria INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  nome VARCHAR(60) NOT NULL UNIQUE
+);
+
+CREATE TABLE produtos (
+  id_produto INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id_categoria INTEGER NOT NULL REFERENCES categorias(id_categoria),
+  sku VARCHAR(20) NOT NULL UNIQUE,
+  nome VARCHAR(120) NOT NULL,
+  preco NUMERIC(10,2) NOT NULL CHECK (preco > 0),
+  ativo BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE pedidos (
+  id_pedido INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id_cliente INTEGER NOT NULL REFERENCES clientes(id_cliente),
+  id_endereco_entrega INTEGER NOT NULL REFERENCES enderecos(id_endereco),
+  data_pedido TIMESTAMP NOT NULL,
+  status VARCHAR(20) NOT NULL CHECK (status IN ('CRIADO','PAGO','ENVIADO','ENTREGUE','CANCELADO')),
+  frete NUMERIC(10,2) NOT NULL CHECK (frete >= 0)
+);
+
+CREATE TABLE itens_pedido (
+  id_pedido INTEGER NOT NULL REFERENCES pedidos(id_pedido),
+  id_produto INTEGER NOT NULL REFERENCES produtos(id_produto),
+  quantidade INTEGER NOT NULL CHECK (quantidade > 0),
+  preco_unitario NUMERIC(10,2) NOT NULL CHECK (preco_unitario > 0),
+  PRIMARY KEY (id_pedido, id_produto)
+);
+
+INSERT INTO clientes (nome, email, telefone) VALUES
+('Ana Souza', 'ana@exemplo.com', '11999990001'),
+('Bruno Lima', 'bruno@exemplo.com', '11999990002'),
+('Carla Mendes', 'carla@exemplo.com', '21999990003'),
+('Diego Alves', 'diego@exemplo.com', '31999990004');
+
+INSERT INTO enderecos (id_cliente, apelido, logradouro, numero, cidade, uf, cep) VALUES
+(1, 'Casa', 'Rua das Flores', '120', 'São Paulo', 'SP', '01001000'),
+(1, 'Trabalho', 'Av. Central', '900', 'São Paulo', 'SP', '01310000'),
+(2, 'Casa', 'Rua do Mercado', '45', 'Campinas', 'SP', '13010000'),
+(3, 'Casa', 'Av. Atlântica', '700', 'Rio de Janeiro', 'RJ', '22010000'),
+(4, 'Casa', 'Rua da Serra', '88', 'Belo Horizonte', 'MG', '30110000');
+
+INSERT INTO categorias (nome) VALUES ('Livros'), ('Informática'), ('Papelaria');
+
+INSERT INTO produtos (id_categoria, sku, nome, preco) VALUES
+(1, 'LIV-001', 'Modelagem de Dados', 89.90),
+(1, 'LIV-002', 'MongoDB na Prática', 109.90),
+(2, 'INF-001', 'Teclado Mecânico', 249.90),
+(2, 'INF-002', 'Mouse sem Fio', 129.90),
+(2, 'INF-003', 'Webcam Full HD', 199.90),
+(3, 'PAP-001', 'Caderno Universitário', 29.90),
+(3, 'PAP-002', 'Caneta Técnica', 14.90);
+
+INSERT INTO pedidos (id_cliente, id_endereco_entrega, data_pedido, status, frete) VALUES
+(1, 1, '2026-08-01 10:15:00', 'PAGO', 18.00),
+(2, 3, '2026-08-02 14:30:00', 'ENVIADO', 22.00),
+(1, 2, '2026-08-03 09:20:00', 'CRIADO', 15.00),
+(3, 4, '2026-08-04 18:45:00', 'ENTREGUE', 28.00),
+(4, 5, '2026-08-05 11:10:00', 'CANCELADO', 20.00),
+(3, 4, '2026-08-06 16:05:00', 'PAGO', 25.00);
+
+INSERT INTO itens_pedido (id_pedido, id_produto, quantidade, preco_unitario) VALUES
+(1, 1, 1, 89.90), (1, 2, 1, 109.90),
+(2, 3, 1, 249.90), (2, 4, 2, 129.90),
+(3, 6, 3, 29.90),
+(4, 2, 1, 109.90), (4, 5, 1, 199.90),
+(5, 7, 5, 14.90),
+(6, 1, 1, 89.90), (6, 4, 1, 129.90), (6, 6, 2, 29.90);
+
+--1
+SELECT * 
+ FROM pedidos 
+WHERE status = 'PAGO';
+
+--2
+SELECT id_pedido, data_pedido, status 
+ FROM pedidos
+ORDER BY data_pedido DESC
+LIMIT 3;
+
+--3
+SELECT p.*
+ FROM pedidos p
+INNER JOIN enderecos e
+ ON p.id_endereco_entrega = e.id_endereco
+WHERE e.uf = 'SP';
+
+--4
+SELECT p.*
+ FROM pedidos p
+INNER JOIN clientes c 
+ ON p.id_cliente = c.id_cliente
+WHERE c.nome = 'Ana Souza';
+
+--5
+SELECT p.*
+ FROM pedidos p
+INNER JOIN itens_pedido it ON p.id_pedido = it.id_pedido
+INNER JOIN produtos pro ON it.id_produto = pro.id_produto
+INNER JOIN categorias c ON pro.id_categoria = c.id_categoria
+WHERE c.nome = 'Livros';
+
+--6
+SELECT p.*
+FROM pedidos p
+JOIN itens_pedido it ON p.id_pedido = it.id_pedido
+JOIN produtos pr ON it.id_produto = pr.id_produto
+WHERE pr.sku = 'INF-002' AND it.quantidade >= 2;
+
+--7
+SELECT 
+ p.id_pedido,
+ SUM(it.quantidade * it.preco_unitario) AS total_itens,
+ p.frete,
+ SUM(it.quantidade * it.preco_unitario) + p.frete AS total_pedido
+FROM pedidos p
+JOIN itens_pedido it ON p.id_pedido = it.id_pedido
+GROUP BY p.id_pedido, p.frete
+ORDER BY p.id_pedido;
+
+

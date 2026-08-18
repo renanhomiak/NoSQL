@@ -1,0 +1,46 @@
+db.createCollection("alunos",{
+  validator: { $jsonSchema: {
+    bsonType: "object",
+    required: ["nome", "idade","curso"],
+    properties:{
+      nome: {bsonType: "string"},
+      idade: {bsonType: "int", minimum: 0},
+      curso: {bsonType: "string"}
+    }
+  }}
+})
+
+db.runCommand({
+  collMod: "alunos",
+  validator: { $jsonSchema: {
+    bsonType: "object",
+    required: ["nome", "idade","curso"],
+    properties:{
+      nome: {bsonType: "string"},
+      idade: {bsonType: "int", minimum: 0},
+      curso: {bsonType: "string"}
+    }
+  }},
+  validationLevel: "moderate",
+  validationAction: "warn"
+})
+
+
+db.alunos.insertMany([
+{ nome: "Ana", idade: NumberInt(21), curso: "Sistemas de Informação" },
+{ nome: "Bruno", idade: NumberInt(22) },
+{ nome: "Carla", idade: "20", curso: "Administração" },
+{ nome: "Diego", idade: NumberInt(19), curso: "Sistemas de Informação" }
+])
+
+db.alunos.find()
+
+db.alunos.find({},{_id: 0, nome: 1, idade: 1, curso: 1})
+
+db.alunos.find({ curso: { $exists: false}},{})
+
+db.alunos.find({ idade: {$type: "int"}}, {})
+
+db.alunos.find({ idade: {$type: "string"}},{})
+
+db.alunos.find({ idade: {$type: "int"}, curso: { $exists: true}},{})
